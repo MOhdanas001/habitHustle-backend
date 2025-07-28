@@ -2,8 +2,10 @@ package com.habithustle.habithustle_backend.services;
 
 import com.habithustle.habithustle_backend.DTO.SearchRequest;
 import com.habithustle.habithustle_backend.model.Hustle;
+import com.habithustle.habithustle_backend.model.Proofs;
 import com.habithustle.habithustle_backend.model.bet.*;
 import com.habithustle.habithustle_backend.repository.HustleRepository;
+import com.habithustle.habithustle_backend.repository.ProofRepository;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,8 @@ public class HustleService {
     private UserRepository  userRepository;
     @Autowired
     private ImagekitService imagekitService;
+    @Autowired
+    private ProofRepository proofRepo;
 
     public Object createBet(SearchRequest.BetRequestDTO req){
 
@@ -137,29 +141,29 @@ public class HustleService {
             if (elapsedDays > totalDays) elapsedDays = totalDays;
 
 
-
             Map<String, Object> betData = new HashMap<>();
             betData.put("betId", bet.getId());
             betData.put("name", bet.getName());
             betData.put("description", bet.getDescription());
-            betData.put("totalDays", totalDays);
+            betData.put("progress", elapsedDays/totalDays);
+            betData.put("participantStatus",bet.getParticipants().stream().filter(p->p.getUserId().equals(userId)).findFirst());
 
             return betData;
         }).collect(Collectors.toList());
 
         Map<String, Object> result = new HashMap<>();
+        result.put("data", response);
         result.put("status", 1);
-        result.put("bets", response);
 
         return result;
     }
 
-    public Object uploadProofFlexible(String betId, String userId, String proofUrl, MultipartFile imageFile, LocalDate date) {
+    public Object uploadProofFlexible(String betId, String userId, String proofUrl, MultipartFile imageFile) {
         Optional<Hustle> optBet = hustleRepository.findById(betId);
         if (optBet.isEmpty()) return Map.of("status", 0, "message", "Bet not found");
 
         Hustle bet = optBet.get();
-        LocalDate proofDate = (date != null) ? date : LocalDate.now();
+        LocalDate proofDate =LocalDate.now();
 
         Optional<SearchRequest.Participants> participantOpt = bet.getParticipants().stream()
                 .filter(p -> p.getUserId().equals(userId))
@@ -170,32 +174,52 @@ public class HustleService {
         var participant = participantOpt.get();
 
         String finalProofUrl = proofUrl;
+        var proofType="url";
 
         if (imageFile != null && !imageFile.isEmpty()) {
             // Save locally or upload to cloud and get URL
             finalProofUrl = imagekitService.uploadProof(imageFile);
+            proofType="image";
         }
 
         if (finalProofUrl == null || finalProofUrl.isBlank()) {
             return Map.of("status", 0, "message", "No proof provided");
         }
 
-        String combined = proofDate.toString() + ":" + finalProofUrl;
+        String combined = finalProofUrl;
 
         if (participant.getProofs().containsKey(combined)) {
             return Map.of("status", 0, "message", "Proof already submitted for this date");
         }
 
-        participant.getProofs().put(combined,0);
+
+
+       Proofs proof=Proofs.builder()
+               .proof(combined)
+               .participantId(userId)
+               .Status(0)
+               .betId(betId)
+               .verifierId(bet.getVerifierId())
+               .proofType(proofType)
+               .build();
+
+       proofRepo.save(proof);
+
+        participant.getProofs().put(proof.getId(),0);
         participant.setBetStatus(BetParticipationStatus.ACTIVE);
         bet.setUpdatedAt(LocalDateTime.now());
-
         hustleRepository.save(bet);
 
-        return Map.of("status", 1, "message", "Proof uploaded", "proof", combined);
+       return Map.of("status", 1, "message", "Proof uploaded", "proof", combined);
     }
 
-
+//    public Object verifyProof(String proofId,String betId,Boolean verified){
+//
+//        Optional<Hustle> bet=hustleRepository.findById(betId);
+//
+//
+//
+//    }
 
 
 
