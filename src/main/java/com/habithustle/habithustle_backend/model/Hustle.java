@@ -41,8 +41,6 @@ public class Hustle
     private LocalDateTime startDate;
     private LocalDateTime endDate;
 
-    private Map<String, String> generalProofs;          // Optional general proof storage
-
     @CreatedDate
     private LocalDateTime createdAt;
 

@@ -33,17 +33,17 @@ public class HustleController
 
     @GetMapping("/viewBet")
     public Object viewBet(@RequestParam String betId){
-        return hustleService.ViewBet(betId);
+        return hustleService.viewBet(betId);
     }
 
-//    @PostMapping("/uploadProof")
+//   @PostMapping("/uploadProof")
     @PostMapping(value = "/uploadProof", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Object uploadProof(@ModelAttribute UploadProofReq req){
-        System.out.println("uploadingproofs");
         return hustleService.uploadProofFlexible(req.getBetId(),req.getUserId(),req.getProofUrl(), req.getImageFile());
     }
 
-
+//    @GetMapping("/activate-bet")
+//    public Object activate
 
 
 

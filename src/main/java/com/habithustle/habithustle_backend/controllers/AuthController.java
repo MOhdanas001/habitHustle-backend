@@ -10,6 +10,9 @@ import com.habithustle.habithustle_backend.repository.PasswordResetRepository;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import com.habithustle.habithustle_backend.services.ImagekitService;
 import com.habithustle.habithustle_backend.util.JwtUtil;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import org.springframework.http.MediaType;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -41,13 +45,29 @@ public class AuthController {
     @Autowired
     private ImagekitService imagekitService;
 
-    @PostMapping("/register")
+    @PostMapping(
+            value = "/register",
+            consumes = { MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE }
+    )
     public ResponseEntity<?> registerUser(
-            @RequestPart UserRegistrationReq userDto,
-            @RequestPart MultipartFile imageFile) {
+            @RequestBody(required = false) UserRegistrationReq bodyDto,
+            @RequestPart(required = false) UserRegistrationReq partDto,
+            @RequestPart(required = false) MultipartFile imageFile,
+            HttpServletRequest request) {
 
         try {
-            // 1. Check for email or username already taken
+            // 🔥 Pick the correct DTO
+            UserRegistrationReq userDto =
+                    bodyDto != null ? bodyDto : partDto;
+
+            if (userDto == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "status", 0,
+                        "message", "Invalid request data"
+                ));
+            }
+
+            // 1. Validate unique fields
             if (userRepository.existsByEmail(userDto.getEmail())) {
                 return ResponseEntity.ok(Map.of("status", 0, "message", "Email already exists"));
             }
@@ -56,22 +76,25 @@ public class AuthController {
                 return ResponseEntity.ok(Map.of("status", 0, "message", "Username already exists"));
             }
 
-            // 2. Upload the image and get resized CDN URL
-            String imageUrl = imagekitService.uploadProfile(imageFile);
+            // 2. Handle optional image
+            String imageUrl = "https://cdn.default/avatar.png";
+            if (imageFile != null && !imageFile.isEmpty()) {
+                imageUrl = imagekitService.uploadProfile(imageFile);
+            }
 
-            // 3. Create actual User object from DTO
+            // 3. Create User
             User user = new User();
             user.setName(userDto.getName());
             user.setEmail(userDto.getEmail());
             user.setUsername(userDto.getUsername());
             user.setPassword(passwordEncoder.encode(userDto.getPassword()));
             user.setRole("User");
-            user.setProfileURL(imageUrl); // <-- set the uploaded image URL
+            user.setProfileURL(imageUrl);
 
-            // 4. Save user to DB
+            // 4. Save
             User savedUser = userRepository.save(user);
 
-            // 5. Generate JWT token
+            // 5. JWT
             String token = jwtUtil.generateToken(savedUser);
 
             return ResponseEntity.ok(Map.of(
@@ -80,7 +103,6 @@ public class AuthController {
                     "token", token,
                     "username", savedUser.getUsername(),
                     "email", savedUser.getEmail()
-
             ));
 
         } catch (Exception e) {
@@ -92,46 +114,63 @@ public class AuthController {
         }
     }
 
+
+
     @PostMapping("/login")
-    public ResponseEntity<?> userLogin(@RequestBody LoginReq request){
-try {
-    Optional<User> user;
-    // Try finding by email
-    if (request.getIdentifier().contains("@")) {
-        user = userRepository.findUserByEmail(request.getIdentifier());
-    } else {
-        user = userRepository.findByUsername(request.getIdentifier());
-    }
+    public ResponseEntity<?> userLogin(
+            @RequestBody LoginReq request,
+            HttpServletResponse response
+    ) {
+        try {
+            Optional<User> user;
 
-    if (user.isEmpty()) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
-                "status", 0,
-                "message", "Invalid username/email or password"
-        ));
-    }
-    if (!passwordEncoder.matches(request.getPassword(), user.get().getPassword())) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
-                "status", -1,
-                "message", "Invalid Credentials"
+            if (request.getIdentifier().contains("@")) {
+                user = userRepository.findUserByEmail(request.getIdentifier());
+            } else {
+                user = userRepository.findByUsername(request.getIdentifier());
+            }
 
-        ));
-    }
+            if (user.isEmpty() ||
+                    !passwordEncoder.matches(request.getPassword(), user.get().getPassword())) {
 
-    String token = jwtUtil.generateToken(user.get());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Map.of(
+                                "success", false,
+                                "message", "Invalid credentials"
+                        )
+                );
+            }
 
-    return ResponseEntity.ok(Map.of(
-            "status", 1,
-            "token", token,
-            "username", user.get().getUsername(),
-            "email", user.get().getEmail()
-    ));
-    } catch (Exception e) {
-        e.printStackTrace();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                "status", 0,
-                "message", "Login failed due to internal error"
-        ));
-    }
+            String token = jwtUtil.generateToken(user.get());
+
+            Cookie cookie = new Cookie("auth_token", token);
+            cookie.setHttpOnly(true);          // JS can't read it
+            cookie.setSecure(true);            // HTTPS only (set false for local dev)
+            cookie.setPath("/");
+            cookie.setMaxAge(60 * 60 * 24 * 7);    // 1 day
+
+            response.addCookie(cookie);
+
+            return ResponseEntity.ok(
+                    Map.of(
+                            "success", true,
+                            "user", Map.of(
+                                    "id", user.get().getId(),
+                                    "username", user.get().getUsername(),
+                                    "email", user.get().getEmail()
+                            )
+                    )
+            );
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Map.of(
+                            "success", false,
+                            "message", "Login failed"
+                    )
+            );
+        }
     }
 
     @PostMapping("/forgot-password")
@@ -223,6 +262,40 @@ try {
         int otp = 10000 + new Random().nextInt(90000); // generates between 10000–99999
         return String.valueOf(otp);
     }
+
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me(HttpServletRequest request) {
+
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String token = null;
+        for (Cookie c : cookies) {
+            if ("auth_token".equals(c.getName())) {
+                token = c.getValue();
+                break;
+            }
+        }
+
+        if (token == null || !jwtUtil.validateToken(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String username = jwtUtil.extractUsername(token);
+        User user = userRepository.findByUsername(username).orElseThrow();
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "id", user.getId(),
+                        "username", user.getUsername(),
+                        "email", user.getEmail()
+                )
+        );
+    }
+
 
 
 }

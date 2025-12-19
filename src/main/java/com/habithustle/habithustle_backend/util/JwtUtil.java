@@ -48,6 +48,28 @@ public class JwtUtil {
       return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
    }
 
+   public boolean validateToken(String token) {
+      try {
+         Jwts.parser()
+                 .setSigningKey(getSignInKey())
+                 .build()
+                 .parseClaimsJws(token); // throws if invalid
+         return true;
+      } catch (ExpiredJwtException e) {
+         System.out.println("JWT expired");
+      } catch (UnsupportedJwtException e) {
+         System.out.println("JWT unsupported");
+      } catch (MalformedJwtException e) {
+         System.out.println("JWT malformed");
+      } catch (SignatureException e) {
+         System.out.println("JWT signature invalid");
+      } catch (IllegalArgumentException e) {
+         System.out.println("JWT empty");
+      }
+      return false;
+   }
+
+
    private boolean isTokenExpired(String token) {
       return extractClaim(token, Claims::getExpiration).before(new Date());
    }

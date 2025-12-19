@@ -1,5 +1,6 @@
 package com.habithustle.habithustle_backend.model;
 
+import com.habithustle.habithustle_backend.model.bet.ProofStatus;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -22,7 +23,7 @@ public class Proofs {
     private String proof;
     private String participantId;
 
-    private Integer Status;
+    private ProofStatus status;
 
     private String betId;
 

@@ -2,6 +2,7 @@ package com.habithustle.habithustle_backend.DTO;
 
 import com.habithustle.habithustle_backend.model.bet.BetParticipationStatus;
 import com.habithustle.habithustle_backend.model.bet.PaymentStatus;
+import com.habithustle.habithustle_backend.model.bet.ProofStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,6 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class SearchRequest {
@@ -33,12 +35,11 @@ public class SearchRequest {
 
     @Data
     @Builder
-    public static class Participants
-    {
+    public static class Participants {
         private String userId;
-        private PaymentStatus paymentStatus;          // UNPAID, PAID
-        private BetParticipationStatus betStatus;     // NOT_STARTED, ACTIVE, FAILED, COMPLETED
-        private HashMap<String,Integer> proofs;                  // Image URLs / file references
+        private PaymentStatus paymentStatus;
+        private BetParticipationStatus betStatus;
+        private Map<String, ProofStatus> proofs; // proofId -> status
         private Integer usedOffDays;
     }
 }
