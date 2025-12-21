@@ -14,7 +14,9 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
@@ -30,6 +33,7 @@ import org.springframework.http.MediaType;
 
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AuthController {
 
     @Autowired
@@ -51,38 +55,51 @@ public class AuthController {
     )
     public ResponseEntity<?> registerUser(
             @RequestBody(required = false) UserRegistrationReq bodyDto,
-            @RequestPart(required = false) UserRegistrationReq partDto,
             @RequestPart(required = false) MultipartFile imageFile,
-            HttpServletRequest request) {
-
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
         try {
-            // 🔥 Pick the correct DTO
-            UserRegistrationReq userDto =
-                    bodyDto != null ? bodyDto : partDto;
+            UserRegistrationReq userDto = bodyDto;
 
             if (userDto == null) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "status", 0,
-                        "message", "Invalid request data"
-                ));
+                return ResponseEntity.badRequest().body(
+                        new HashMap<>() {{
+                            put("status", 0);
+                            put("message", "Invalid request data");
+                        }}
+                );
             }
 
-            // 1. Validate unique fields
+            // Validation
+            if (userDto.getEmail() == null || userDto.getUsername() == null) {
+                return ResponseEntity.badRequest().body(
+                        new HashMap<>() {{
+                            put("status", 0);
+                            put("message", "Missing required fields");
+                        }}
+                );
+            }
+
             if (userRepository.existsByEmail(userDto.getEmail())) {
-                return ResponseEntity.ok(Map.of("status", 0, "message", "Email already exists"));
+                return ResponseEntity.ok(
+                        Map.of("status", 0, "message", "Email already exists")
+                );
             }
 
             if (userRepository.existsByUsername(userDto.getUsername())) {
-                return ResponseEntity.ok(Map.of("status", 0, "message", "Username already exists"));
+                return ResponseEntity.ok(
+                        Map.of("status", 0, "message", "Username already exists")
+                );
             }
 
-            // 2. Handle optional image
+            // Image upload
             String imageUrl = "https://cdn.default/avatar.png";
             if (imageFile != null && !imageFile.isEmpty()) {
                 imageUrl = imagekitService.uploadProfile(imageFile);
             }
 
-            // 3. Create User
+            // Create user
             User user = new User();
             user.setName(userDto.getName());
             user.setEmail(userDto.getEmail());
@@ -91,30 +108,49 @@ public class AuthController {
             user.setRole("User");
             user.setProfileURL(imageUrl);
 
-            // 4. Save
             User savedUser = userRepository.save(user);
 
-            // 5. JWT
+            // Generate token and set cookie
             String token = jwtUtil.generateToken(savedUser);
 
-            return ResponseEntity.ok(Map.of(
-                    "status", 1,
-                    "message", "User registered successfully",
-                    "token", token,
+            // Create cookie
+            ResponseCookie cookie = ResponseCookie.from("auth_token", token)
+                    .httpOnly(true)
+                    .secure(false)
+                    .sameSite("Lax")
+                    .path("/")
+                    .maxAge(60 * 60 * 24 * 7)
+                    .domain("localhost") // Explicit domain
+                    .build();
+
+            System.out.println("🍪 Setting cookie: " + cookie.toString());
+
+            // Build response
+            Map<String, Object> res = new HashMap<>();
+            res.put("status", 1);
+            res.put("message", "User registered successfully");
+            res.put("token", token);
+            res.put("user", Map.of(
+                    "id", savedUser.getId(),
                     "username", savedUser.getUsername(),
-                    "email", savedUser.getEmail()
+                    "email", savedUser.getEmail(),
+                    "name", savedUser.getName(),
+                    "profileURL", savedUser.getProfileURL()
             ));
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(res);
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "status", 0,
-                    "message", "An error occurred during registration"
-            ));
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", 0);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }
-
-
 
     @PostMapping("/login")
     public ResponseEntity<?> userLogin(
@@ -143,31 +179,41 @@ public class AuthController {
 
             String token = jwtUtil.generateToken(user.get());
 
-            Cookie cookie = new Cookie("auth_token", token);
-            cookie.setHttpOnly(true);          // JS can't read it
-            cookie.setSecure(true);            // HTTPS only (set false for local dev)
-            cookie.setPath("/");
-            cookie.setMaxAge(60 * 60 * 24 * 7);    // 1 day
+            ResponseCookie cookie = ResponseCookie.from("auth_token", token)
+                    .httpOnly(true)
+                    .secure(false)
+                    .sameSite("Lax")
+                    .path("/")
+                    .maxAge(60 * 60 * 24 * 7)
+                    .domain("localhost") // Explicit domain
+                    .build();
 
-            response.addCookie(cookie);
+            System.out.println("🍪 Login - Setting cookie: " + cookie.toString());
+            System.out.println("🔑 Token: " + token);
 
-            return ResponseEntity.ok(
-                    Map.of(
+            User u = user.get();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(Map.of(
                             "success", true,
+                            "message", "Login successful",
+                            "token", token,
                             "user", Map.of(
-                                    "id", user.get().getId(),
-                                    "username", user.get().getUsername(),
-                                    "email", user.get().getEmail()
+                                    "id", u.getId(),
+                                    "username", u.getUsername(),
+                                    "email", u.getEmail(),
+                                    "name", u.getName(),
+                                    "profileURL", u.getProfileURL(),
+                                    "role", u.getRole()
                             )
-                    )
-            );
+                    ));
 
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     Map.of(
                             "success", false,
-                            "message", "Login failed"
+                            "message", "Login failed: " + e.getMessage()
                     )
             );
         }
@@ -176,8 +222,6 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody EmailReq email) {
         try {
-            System.out.println("email: " + email.getEmail());
-
             if (!userRepository.existsByEmail(email.getEmail())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                         "status", 0,
@@ -185,13 +229,9 @@ public class AuthController {
                 ));
             }
 
-            // Generate OTP
             String newToken = generateOTP();
-
-            // Remove old OTPs
             tokenRepo.deleteByEmail(email.getEmail());
 
-            // Save new token
             PasswordResetToken token = PasswordResetToken.builder()
                     .email(email.getEmail())
                     .token(newToken)
@@ -200,7 +240,6 @@ public class AuthController {
 
             tokenRepo.save(token);
 
-            // Send email
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(email.getEmail());
             message.setSubject("Password Reset Request");
@@ -237,7 +276,6 @@ public class AuthController {
             user.setPassword(passwordEncoder.encode(req.getPassword()));
             userRepository.save(user);
 
-            // Remove OTP token after successful reset
             tokenRepo.deleteByEmail(user.getEmail());
 
             return ResponseEntity.ok(Map.of(
@@ -254,48 +292,116 @@ public class AuthController {
         }
     }
 
-
-
-
-
-    public String generateOTP() {
-        int otp = 10000 + new Random().nextInt(90000); // generates between 10000–99999
-        return String.valueOf(otp);
-    }
-
-
     @GetMapping("/me")
     public ResponseEntity<?> me(HttpServletRequest request) {
+        System.out.println("📍 /me endpoint hit");
 
+        // Log all cookies received
         Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        String token = null;
-        for (Cookie c : cookies) {
-            if ("auth_token".equals(c.getName())) {
-                token = c.getValue();
-                break;
+        if (cookies != null) {
+            System.out.println("🍪 Cookies received:");
+            for (Cookie c : cookies) {
+                System.out.println("  - " + c.getName() + " = " + c.getValue());
             }
+        } else {
+            System.out.println("❌ No cookies received!");
         }
 
-        if (token == null || !jwtUtil.validateToken(token)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        String token = extractTokenFromCookie(request);
+
+        if (token == null) {
+            System.out.println("🔍 No token in cookie, checking Authorization header...");
+            token = extractTokenFromHeader(request);
+        }
+
+        if (token == null) {
+            System.out.println("❌ No token found anywhere");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "No authentication token found")
+            );
+        }
+
+        System.out.println("🔑 Token found: " + token.substring(0, Math.min(20, token.length())) + "...");
+
+        if (!jwtUtil.validateToken(token)) {
+            System.out.println("❌ Token validation failed");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "Invalid or expired token")
+            );
         }
 
         String username = jwtUtil.extractUsername(token);
-        User user = userRepository.findByUsername(username).orElseThrow();
+        System.out.println("👤 Username from token: " + username);
+
+        Optional<User> userOpt = userRepository.findUserByEmail(username);
+
+        if (userOpt.isEmpty()) {
+            System.out.println("❌ User not found: " + username);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("message", "User not found")
+            );
+        }
+
+        User user = userOpt.get();
+        System.out.println("✅ User authenticated: " + user.getUsername());
 
         return ResponseEntity.ok(
                 Map.of(
                         "id", user.getId(),
                         "username", user.getUsername(),
-                        "email", user.getEmail()
+                        "email", user.getEmail(),
+                        "name", user.getName(),
+                        "profileURL", user.getProfileURL(),
+                        "role", user.getRole()
                 )
         );
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("auth_token", "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(0)
+                .domain("localhost")
+                .build();
 
+        System.out.println("🚪 Logout - Clearing cookie");
 
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(Map.of(
+                        "success", true,
+                        "message", "Logged out successfully"
+                ));
+    }
+
+    private String extractTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+
+        for (Cookie cookie : cookies) {
+            if ("auth_token".equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
+
+    private String extractTokenFromHeader(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+
+    private String generateOTP() {
+        int otp = 10000 + new Random().nextInt(90000);
+        return String.valueOf(otp);
+    }
 }
