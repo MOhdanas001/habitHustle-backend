@@ -1,5 +1,6 @@
 package com.habithustle.habithustle_backend.model;
 
+import com.habithustle.habithustle_backend.model.bet.RequestStatus;
 import com.habithustle.habithustle_backend.model.wallet.Wallet;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -13,7 +14,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @Document(collection = "users")
@@ -52,7 +55,10 @@ public class User {
     private Set<String> bets = new HashSet<>();
 
 
-    private Set<String> friends=new HashSet<>();
+    private Map<String, RequestStatus> sentRequests = new HashMap<>();
+
+    private Map<String, RequestStatus> receivedRequests = new HashMap<>();
+
 
     @CreatedDate
     private LocalDateTime createdAt;

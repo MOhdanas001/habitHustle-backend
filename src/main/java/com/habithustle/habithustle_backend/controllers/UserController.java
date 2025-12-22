@@ -1,5 +1,6 @@
 package com.habithustle.habithustle_backend.controllers;
 
+import com.habithustle.habithustle_backend.DTO.FriendListRes;
 import com.habithustle.habithustle_backend.DTO.SearchRequest;
 import com.habithustle.habithustle_backend.DTO.SearchResponse;
 import com.habithustle.habithustle_backend.model.User;
@@ -21,32 +22,30 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    @GetMapping("/search/user")
-    public ResponseEntity<?> searchUser(@RequestParam("val") String value) {
-        try {
+    @GetMapping("/search/users")
+    public ResponseEntity<FriendListRes<List<SearchResponse>>> searchUsers(
+            @RequestParam("q") String query
+    ) {
 
-            List<User> users = userRepository.searchByUsername(value);
-            List<SearchResponse> result = users.stream()
-                    .map(user -> new SearchResponse(
-                            user.getId(),
-                            user.getUsername(),
-                            user.getProfileURL()
-                    ))
-                    .toList();
-
-            return ResponseEntity.ok(Map.of(
-                    "status", 1,
-                    "data", result
-
-            ));
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "status", 0,
-                    "message", "An error occurred while searching for users"
-            ));
+        if (query == null || query.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(new FriendListRes<>(false, "Search query is required", List.of()));
         }
+        System.out.println("Searcing for user: " + query);
+
+        List<SearchResponse> result = userRepository
+                .searchByUsername(query)
+                .stream()
+                .map(user -> new SearchResponse(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getProfileURL()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(
+                new FriendListRes<>(true, "Users fetched", result)
+        );
     }
 
 

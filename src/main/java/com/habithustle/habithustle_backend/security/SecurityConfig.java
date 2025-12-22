@@ -33,7 +33,7 @@ public class SecurityConfig {
     public AuthenticationEntryPoint una() {
         return (request, response, authException) -> {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Unauthorized");
+            response.getWriter().write("Unauthorized Anas");
         };
     }
 

@@ -1,10 +1,12 @@
 package com.habithustle.habithustle_backend.controllers;
 
+import com.habithustle.habithustle_backend.DTO.ApiResponse;
 import com.habithustle.habithustle_backend.DTO.RespndRequest;
 import com.habithustle.habithustle_backend.model.User;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import com.habithustle.habithustle_backend.services.FriendRequestService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,15 +26,29 @@ public class FriendController {
     private UserRepository userRepository;
 
     @PostMapping("/send")
-    public ResponseEntity<?> sendRequest(@RequestParam String toUserId, @AuthenticationPrincipal UserDetails user) {
-        String senderEmail=user.getUsername();
+    public ResponseEntity <ApiResponse> sendRequest(
+            @RequestParam String toUserId,
+            @AuthenticationPrincipal UserDetails user
+    ) {
+        if (user == null) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse(false, "Unauthorized"));
+        }
+
+        String senderEmail = user.getUsername();
+
         User sender = userRepository.findUserByEmail(senderEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("Sender not found"));
 
-        String senderId = sender.getId();
-        String message = service.sendRequest(senderId, toUserId); // assuming username = userId
-        return ResponseEntity.ok(Map.of("message", message));
+        ApiResponse response =
+                service.sendRequest(sender.getId(), toUserId);
+
+        return response.isSuccess()
+                ? ResponseEntity.ok(response)
+                : ResponseEntity.badRequest().body(response);
     }
+
 
     @PostMapping("/respond")
     public ResponseEntity<?> respondToRequest(
@@ -44,8 +60,10 @@ public class FriendController {
                 .orElseThrow(() -> new UsernameNotFoundException("Sender not found"));
 
         String receiverId = receiver.getId();
-        String message = service.respondToRequest(req.getRequestId(), receiverId, req.getAccept());
-        return ResponseEntity.ok(Map.of("message", message));
+        ApiResponse response = service.respondToRequest(req.getRequestId(), receiverId, req.getAccept());
+        return response.isSuccess()
+                ? ResponseEntity.ok(response)
+                : ResponseEntity.badRequest().body(response);
     }
 
     @GetMapping("/requests")
@@ -53,7 +71,7 @@ public class FriendController {
         return ResponseEntity.ok(service.getPendingRequests(user.getId()));
     }
 
-    @GetMapping
+    @GetMapping("/pending-request")
     public ResponseEntity<?> getFriends(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(service.getFriends(user.getId()));
     }

@@ -188,8 +188,6 @@ public class AuthController {
                     .domain("localhost") // Explicit domain
                     .build();
 
-            System.out.println("🍪 Login - Setting cookie: " + cookie.toString());
-            System.out.println("🔑 Token: " + token);
 
             User u = user.get();
             return ResponseEntity.ok()
