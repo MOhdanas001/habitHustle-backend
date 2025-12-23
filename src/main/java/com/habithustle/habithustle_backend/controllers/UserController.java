@@ -31,8 +31,6 @@ public class UserController {
             return ResponseEntity.badRequest()
                     .body(new FriendListRes<>(false, "Search query is required", List.of()));
         }
-        System.out.println("Searcing for user: " + query);
-
         List<SearchResponse> result = userRepository
                 .searchByUsername(query)
                 .stream()

@@ -2,19 +2,15 @@ package com.habithustle.habithustle_backend.services;
 
 import com.habithustle.habithustle_backend.DTO.ApiResponse;
 import com.habithustle.habithustle_backend.DTO.FriendListRes;
-import com.habithustle.habithustle_backend.DTO.FriendRequestEvent;
 import com.habithustle.habithustle_backend.DTO.SearchResponse;
-import com.habithustle.habithustle_backend.model.FriendRequest;
 import com.habithustle.habithustle_backend.model.User;
 import com.habithustle.habithustle_backend.model.bet.RequestStatus;
 import com.habithustle.habithustle_backend.repository.FriendRequestRepository;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -30,10 +26,9 @@ public class FriendRequestService {
     @Autowired
     private MongoTemplate mongoTemplate;
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private FirebaseNotificationService firebaseService;
 
     public ApiResponse sendRequest(String senderId, String receiverId) {
-
         if (senderId == null || receiverId == null) {
             return new ApiResponse(false, "Invalid user id");
         }
@@ -67,39 +62,10 @@ public class FriendRequestService {
         // Update both users
         sender.getSentRequests().put(receiverId, RequestStatus.PENDING);
         receiver.getReceivedRequests().put(senderId, RequestStatus.PENDING);
-
+        System.out.println("request Data updated");
         userRepo.save(sender);
         userRepo.save(receiver);
-
-        // WebSocket events (non-blocking, failure-safe)
-        try {
-            FriendRequestEvent event = new FriendRequestEvent(
-                    "FRIEND_REQUEST_RECEIVED",
-                    senderId,
-                    receiverId,
-                    LocalDateTime.now()
-            );
-
-            messagingTemplate.convertAndSendToUser(
-                    receiverId,
-                    "/queue/friend-requests",
-                    event
-            );
-
-            messagingTemplate.convertAndSendToUser(
-                    senderId,
-                    "/queue/friend-requests",
-                    new FriendRequestEvent(
-                            "FRIEND_REQUEST_SENT",
-                            senderId,
-                            receiverId,
-                            LocalDateTime.now()
-                    )
-            );
-        } catch (Exception e) {
-            System.err.println("WebSocket delivery failed: " + e.getMessage());
-        }
-
+        firebaseService.sendFriendRequest(senderId, receiverId);
         return new ApiResponse(true, "Friend request sent successfully");
     }
 

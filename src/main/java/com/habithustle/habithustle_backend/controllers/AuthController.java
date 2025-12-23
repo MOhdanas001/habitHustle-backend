@@ -1,5 +1,6 @@
 package com.habithustle.habithustle_backend.controllers;
 
+import com.google.firebase.auth.FirebaseToken;
 import com.habithustle.habithustle_backend.DTO.EmailReq;
 import com.habithustle.habithustle_backend.DTO.LoginReq;
 import com.habithustle.habithustle_backend.DTO.ResetPasswordreq;
@@ -48,6 +49,7 @@ public class AuthController {
     private JavaMailSender mailSender;
     @Autowired
     private ImagekitService imagekitService;
+
 
     @PostMapping(
             value = "/register",
@@ -292,57 +294,36 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<?> me(HttpServletRequest request) {
-        System.out.println("📍 /me endpoint hit");
-
         // Log all cookies received
         Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            System.out.println("🍪 Cookies received:");
-            for (Cookie c : cookies) {
-                System.out.println("  - " + c.getName() + " = " + c.getValue());
-            }
-        } else {
-            System.out.println("❌ No cookies received!");
-        }
 
         String token = extractTokenFromCookie(request);
 
         if (token == null) {
-            System.out.println("🔍 No token in cookie, checking Authorization header...");
             token = extractTokenFromHeader(request);
         }
 
         if (token == null) {
-            System.out.println("❌ No token found anywhere");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     Map.of("message", "No authentication token found")
             );
         }
 
-        System.out.println("🔑 Token found: " + token.substring(0, Math.min(20, token.length())) + "...");
-
         if (!jwtUtil.validateToken(token)) {
-            System.out.println("❌ Token validation failed");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     Map.of("message", "Invalid or expired token")
             );
         }
 
         String username = jwtUtil.extractUsername(token);
-        System.out.println("👤 Username from token: " + username);
-
         Optional<User> userOpt = userRepository.findUserByEmail(username);
 
         if (userOpt.isEmpty()) {
-            System.out.println("❌ User not found: " + username);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     Map.of("message", "User not found")
             );
         }
-
         User user = userOpt.get();
-        System.out.println("✅ User authenticated: " + user.getUsername());
-
         return ResponseEntity.ok(
                 Map.of(
                         "id", user.getId(),
@@ -366,8 +347,6 @@ public class AuthController {
                 .domain("localhost")
                 .build();
 
-        System.out.println("🚪 Logout - Clearing cookie");
-
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(Map.of(
@@ -375,6 +354,9 @@ public class AuthController {
                         "message", "Logged out successfully"
                 ));
     }
+
+
+
 
     private String extractTokenFromCookie(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();

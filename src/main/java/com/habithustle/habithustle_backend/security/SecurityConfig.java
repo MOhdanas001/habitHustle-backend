@@ -33,7 +33,7 @@ public class SecurityConfig {
     public AuthenticationEntryPoint una() {
         return (request, response, authException) -> {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Unauthorized Anas");
+            response.getWriter().write("Unauthorized");
         };
     }
 
@@ -42,7 +42,7 @@ public class SecurityConfig {
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(una())) // make sure 'una' is defined
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(una()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
