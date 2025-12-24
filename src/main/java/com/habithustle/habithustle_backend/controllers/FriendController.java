@@ -1,7 +1,7 @@
 package com.habithustle.habithustle_backend.controllers;
 
 import com.habithustle.habithustle_backend.DTO.ApiResponse;
-import com.habithustle.habithustle_backend.DTO.RespndRequest;
+import com.habithustle.habithustle_backend.DTO.RespondRequest;
 import com.habithustle.habithustle_backend.model.User;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import com.habithustle.habithustle_backend.services.FriendRequestService;
@@ -52,7 +52,7 @@ public class FriendController {
 
     @PostMapping("/respond")
     public ResponseEntity<?> respondToRequest(
-            @RequestBody RespndRequest req,
+            @RequestBody RespondRequest req,
             @AuthenticationPrincipal UserDetails user) {
 
         String senderEmail=user.getUsername();
@@ -60,7 +60,7 @@ public class FriendController {
                 .orElseThrow(() -> new UsernameNotFoundException("Sender not found"));
 
         String receiverId = receiver.getId();
-        ApiResponse response = service.respondToRequest(req.getRequestId(), receiverId, req.getAccept());
+        ApiResponse response = service.respondToRequest(req.getSenderId(), receiverId, req.getAccept());
         return response.isSuccess()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.badRequest().body(response);

@@ -71,8 +71,8 @@ public class FriendRequestService {
 
 
     public ApiResponse respondToRequest(
-            String receiverId,
             String senderId,
+            String receiverId,
             boolean accept
     ) {
 
@@ -106,7 +106,7 @@ public class FriendRequestService {
 
             userRepo.save(receiver);
             userRepo.save(sender);
-
+            firebaseService.deleteFriendRequest(senderId,receiverId);
             return new ApiResponse(true, "Friend request accepted");
         }
 
@@ -116,6 +116,8 @@ public class FriendRequestService {
 
         userRepo.save(receiver);
         userRepo.save(sender);
+
+        firebaseService.deleteFriendRequest(senderId,receiverId);
 
         return new ApiResponse(true, "Friend request rejected");
     }

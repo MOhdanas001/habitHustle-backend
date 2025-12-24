@@ -3,6 +3,7 @@ package com.habithustle.habithustle_backend.services;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.habithustle.habithustle_backend.model.User;
+import com.habithustle.habithustle_backend.model.bet.RequestStatus;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -43,8 +44,30 @@ public class FirebaseNotificationService {
         payload.put("timestamp", System.currentTimeMillis());
         dbRef.child("notifications")
                 .child(receiverId)
-                .push()
+                .child(senderId)
                 .setValueAsync(payload);
+    }
+
+    public void updateRequestStatus(
+            RequestStatus status,
+            String senderId,
+            String receiverId
+    ) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", status.name());
+        updates.put("timestamp", System.currentTimeMillis());
+
+        dbRef.child("notifications")
+                .child(receiverId)
+                .child(senderId)
+                .updateChildrenAsync(updates);
+    }
+
+    public void deleteFriendRequest(String senderId, String receiverId) {
+        dbRef.child("notifications")
+                .child(receiverId)
+                .child(senderId)
+                .removeValueAsync();
     }
 
     public void sendGenericNotification(String userId, String message) {
