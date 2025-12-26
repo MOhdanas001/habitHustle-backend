@@ -3,6 +3,7 @@ package com.habithustle.habithustle_backend.controllers;
 import com.habithustle.habithustle_backend.DTO.SearchRequest;
 import com.habithustle.habithustle_backend.DTO.UploadProofReq;
 import com.habithustle.habithustle_backend.services.HustleService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ public class HustleController
     private HustleService hustleService;
 
     @PostMapping("/create")
-    public Object createHustle(@RequestBody SearchRequest.BetRequestDTO req){
+    public Object createHustle(@Valid @RequestBody SearchRequest.BetRequestDTO req){
         return hustleService.createBet(req);
     }
 

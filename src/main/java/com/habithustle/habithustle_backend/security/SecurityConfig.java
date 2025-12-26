@@ -32,10 +32,17 @@ public class SecurityConfig {
     @Bean
     public AuthenticationEntryPoint una() {
         return (request, response, authException) -> {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Unauthorized");
+            response.setContentType("application/json");
+
+            if (authException != null) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write(
+                        "{\"status\":0,\"message\":\"Unauthorized\"}"
+                );
+            }
         };
     }
+
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {

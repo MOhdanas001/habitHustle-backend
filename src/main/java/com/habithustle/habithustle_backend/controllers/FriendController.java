@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/friends")
@@ -67,13 +68,17 @@ public class FriendController {
     }
 
     @GetMapping("/requests")
-    public ResponseEntity<?> getPending(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(service.getPendingRequests(user.getId()));
+    public ResponseEntity<?> getPending(@AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(service.getPendingRequests(user.getUsername()));
     }
 
-    @GetMapping("/pending-request")
-    public ResponseEntity<?> getFriends(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(service.getFriends(user.getId()));
+  @GetMapping("/get-list")
+    public ResponseEntity<?> getFriends(@AuthenticationPrincipal UserDetails user) {
+        Optional<User> authuser=userRepository.findUserByEmail(user.getUsername());
+        User user1= authuser.get();
+        return ResponseEntity.ok(service.getFriends(user1.getId()));
     }
+
+
 }
 

@@ -33,48 +33,67 @@ public class HustleService {
        CREATE BET
     --------------------------------------------------- */
     public Object createBet(SearchRequest.BetRequestDTO req) {
+        try {
 
-        if (req.getStartDate().isBefore(LocalDateTime.now())) {
-            return Map.of("status", 0, "message", "Start Date must be in future");
+            if (req.getStartDate().isBefore(LocalDateTime.now())) {
+                return Map.of(
+                        "status", 0,
+                        "message", "Start Date must be in future"
+                );
+            }
+
+            List<SearchRequest.Participants> participants =
+                    req.getParticipantIds().stream()
+                            .map(id -> SearchRequest.Participants.builder()
+                                    .userId(id)
+                                    .paymentStatus(PaymentStatus.UNPAID)
+                                    .betStatus(BetParticipationStatus.NOT_STARTED)
+                                    .proofs(new HashMap<>())
+                                    .usedOffDays(0)
+                                    .build())
+                            .toList();
+
+            Hustle bet = Hustle.builder()
+                    .name(req.getName())
+                    .description(req.getDescription())
+                    .amount(req.getAmount())
+                    .participants(participants)
+                    .verifierId(req.getVerifierId())
+                    .taskDays(req.getTaskDays())
+                    .allowedOffDays(req.getAllowedOffDays())
+                    .startDate(req.getStartDate())
+                    .endDate(req.getEndDate())
+                    .betStatus(BetStatus.NOT_STARTED)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            Hustle saved = hustleRepository.save(bet);
+
+            req.getParticipantIds().forEach(uid ->
+                    userRepository.findById(uid).ifPresent(u -> {
+                        u.getBets().add(saved.getId());
+                        u.setUpdatedAt(LocalDateTime.now());
+                        userRepository.save(u);
+                    })
+            );
+
+            return Map.of(
+                    "status", 1,
+                    "message", "Bet created",
+                    "betId", saved.getId()
+            );
+
+        } catch (Exception e) {
+            // Optional: log the exception
+            // log.error("Error creating bet", e);
+
+            return Map.of(
+                    "status", 0,
+                    "message", "Failed to create bet",
+                    "error", e.getMessage()
+            );
         }
-
-        List<SearchRequest.Participants> participants =
-                req.getParticipantIds().stream()
-                        .map(id -> SearchRequest.Participants.builder()
-                                .userId(id)
-                                .paymentStatus(PaymentStatus.UNPAID)
-                                .betStatus(BetParticipationStatus.NOT_STARTED)
-                                .proofs(new HashMap<>())
-                                .usedOffDays(0)
-                                .build())
-                        .toList();
-
-        Hustle bet = Hustle.builder()
-                .name(req.getName())
-                .description(req.getDescription())
-                .amount(req.getAmount())
-                .participants(participants)
-                .verifierId(req.getVerifierId())
-                .taskDays(req.getTaskDays())
-                .allowedOffDays(req.getAllowedOffDays())
-                .startDate(req.getStartDate())
-                .endDate(req.getEndDate())
-                .betStatus(BetStatus.NOT_STARTED)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        Hustle saved = hustleRepository.save(bet);
-
-        req.getParticipantIds().forEach(uid ->
-                userRepository.findById(uid).ifPresent(u -> {
-                    u.getBets().add(saved.getId());
-                    u.setUpdatedAt(LocalDateTime.now());
-                    userRepository.save(u);
-                })
-        );
-
-        return Map.of("status", 1, "message", "Bet created", "betId", saved.getId());
     }
 
     /* ---------------------------------------------------

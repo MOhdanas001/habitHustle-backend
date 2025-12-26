@@ -2,6 +2,7 @@ package com.habithustle.habithustle_backend.services;
 
 import com.habithustle.habithustle_backend.DTO.ApiResponse;
 import com.habithustle.habithustle_backend.DTO.FriendListRes;
+import com.habithustle.habithustle_backend.DTO.FriendsList;
 import com.habithustle.habithustle_backend.DTO.SearchResponse;
 import com.habithustle.habithustle_backend.model.User;
 import com.habithustle.habithustle_backend.model.bet.RequestStatus;
@@ -124,7 +125,7 @@ public class FriendRequestService {
 
 
 
-    public FriendListRes<List<SearchResponse>> getFriends(String userId) {
+    public FriendListRes<List<FriendsList>> getFriends(String userId) {
 
         User user = userRepo.findUserById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -149,11 +150,13 @@ public class FriendRequestService {
             return new FriendListRes<>(true, "No friends found", List.of());
         }
 
-        List<SearchResponse> friends = userRepo.findAllById(friendIds).stream()
-                .map(u -> new SearchResponse(
+        List<FriendsList> friends = userRepo.findAllById(friendIds).stream()
+                .map(u -> new FriendsList (
                         u.getId(),
-                        u.getUsername(),
-                        u.getProfileURL()))
+                        u.getName(),
+                        u.getEmail(),
+                        u.getUsername()
+                        ))
                 .toList();
 
         return new FriendListRes<>(

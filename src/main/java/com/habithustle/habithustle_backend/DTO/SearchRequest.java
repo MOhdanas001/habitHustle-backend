@@ -3,6 +3,7 @@ package com.habithustle.habithustle_backend.DTO;
 import com.habithustle.habithustle_backend.model.bet.BetParticipationStatus;
 import com.habithustle.habithustle_backend.model.bet.PaymentStatus;
 import com.habithustle.habithustle_backend.model.bet.ProofStatus;
+import jakarta.validation.constraints.*;
 import lombok.Builder;
 import lombok.Data;
 
@@ -19,18 +20,36 @@ public class SearchRequest {
 
     @Data
     public static class BetRequestDTO {
-            private String name;
-            private String description;
-            private Double amount;
+        @NotBlank(message = "Name is required")
+        private String name;
 
-            private List<String> participantIds;
-            private String verifierId;
+        @Size(max = 500, message = "Description cannot exceed 500 characters")
+        private String description;
 
-            private LocalDateTime startDate;
-            private LocalDateTime endDate;
+        @NotNull(message = "Amount is required")
+        @Positive(message = "Amount must be greater than zero")
+        private Double amount;
 
-            private List<DayOfWeek> taskDays;
-            private Integer allowedOffDays;
+        @NotEmpty(message = "Participant IDs are required")
+        private List<@NotBlank(message = "Participant ID cannot be blank") String> participantIds;
+
+        @NotBlank(message = "Verifier ID is required")
+        private String verifierId;
+
+        @NotNull(message = "Start date is required")
+        @Future(message = "Start date must be in the future")
+        private LocalDateTime startDate;
+
+        @NotNull(message = "End date is required")
+        @Future(message = "End date must be in the future")
+        private LocalDateTime endDate;
+
+        @NotEmpty(message = "Task days are required")
+        private List<DayOfWeek> taskDays;
+
+        @NotNull(message = "Allowed off days is required")
+        @Min(value = 0, message = "Allowed off days cannot be negative")
+        private Integer allowedOffDays;
         }
 
     @Data
