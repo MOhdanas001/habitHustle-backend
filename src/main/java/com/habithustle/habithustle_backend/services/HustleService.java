@@ -149,14 +149,11 @@ public class HustleService {
 
         List<Hustle> bets = hustleRepository.findByParticipantsUserId(userId);
 
-        List<Map<String, Object>> data = bets.stream().map(bet -> {
-            LocalDate today = LocalDate.now();
-            LocalDate start = bet.getStartDate().toLocalDate();
-            LocalDate end = bet.getEndDate().toLocalDate();
+        List<Map<String, Object>> upcoming = new ArrayList<>();
+        List<Map<String, Object>> active = new ArrayList<>();
+        List<Map<String, Object>> completed = new ArrayList<>();
 
-            long total = ChronoUnit.DAYS.between(start, end) + 1;
-            long elapsed = Math.min(Math.max(0,
-                    ChronoUnit.DAYS.between(start, today) + 1), total);
+        for (Hustle bet : bets) {
 
             SearchRequest.Participants participant =
                     bet.getParticipants().stream()
@@ -164,16 +161,42 @@ public class HustleService {
                             .findFirst()
                             .orElse(null);
 
-            return Map.of(
+            Integer participantsCount=bet.getParticipants().size();
+
+            Map<String, Object> betData = Map.of(
                     "betId", bet.getId(),
                     "name", bet.getName(),
                     "description", bet.getDescription(),
-                    "progress", (double) elapsed / total,
+                    "betStatus", bet.getBetStatus(),
+                    "total_amount",bet.getAmount(),
+                    "amount",bet.getAmount()/participantsCount,
+                    "start_date",bet.getStartDate(),
+                    "end_date",bet.getEndDate(),
                     "participantStatus", participant
             );
-        }).toList();
 
-        return Map.of("status", 1, "data", data);
+            switch (bet.getBetStatus()) {
+                case NOT_STARTED -> {
+                    upcoming.add(betData);
+                }
+                case ACTIVE -> {
+                    active.add(betData);
+                }
+                case COMPLETED -> {
+                    completed.add(betData);
+                }
+            }
+        }
+
+
+        return Map.of(
+                "status", 1,
+                "data", Map.of(
+                        "upcoming", upcoming,
+                        "active", active,
+                        "completed", completed
+                )
+        );
     }
 
     /* ---------------------------------------------------

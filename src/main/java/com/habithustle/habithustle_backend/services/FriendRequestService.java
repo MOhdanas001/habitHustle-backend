@@ -153,9 +153,9 @@ public class FriendRequestService {
         List<FriendsList> friends = userRepo.findAllById(friendIds).stream()
                 .map(u -> new FriendsList (
                         u.getId(),
-                        u.getName(),
+                        u.getUsername(),
                         u.getEmail(),
-                        u.getUsername()
+                        u.getName()
                         ))
                 .toList();
 

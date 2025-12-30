@@ -1,5 +1,6 @@
 package com.habithustle.habithustle_backend.model;
 
+import com.habithustle.habithustle_backend.DTO.FriendsList;
 import com.habithustle.habithustle_backend.DTO.SearchRequest;
 import com.habithustle.habithustle_backend.model.bet.BetStatus;
 import lombok.*;
@@ -31,7 +32,11 @@ public class Hustle
     private String proofDescription;
     private List<SearchRequest.Participants> participants;
 
-    private BetStatus betStatus;                 // NOT_STARTED, ACTIVE, COMPLETED
+    private BetStatus betStatus; // NOT_STARTED, ACTIVE, COMPLETED
+    private FriendsList winner;
+
+    private Integer betProgress;
+
 
     private String verifierId;                   // Optional: can also be one of the participants
 

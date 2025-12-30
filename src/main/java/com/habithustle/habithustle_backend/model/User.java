@@ -51,7 +51,6 @@ public class User {
     // Wallet and Bet are separate documents in MongoDB. Use DBRef or embedded models.
     private Wallet wallet;
 
-
     private Set<String> bets = new HashSet<>();
 
 

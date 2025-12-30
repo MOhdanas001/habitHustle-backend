@@ -2,13 +2,20 @@ package com.habithustle.habithustle_backend.controllers;
 
 import com.habithustle.habithustle_backend.DTO.SearchRequest;
 import com.habithustle.habithustle_backend.DTO.UploadProofReq;
+import com.habithustle.habithustle_backend.model.User;
+import com.habithustle.habithustle_backend.repository.UserRepository;
 import com.habithustle.habithustle_backend.services.HustleService;
 import jakarta.validation.Valid;
+import org.apache.http.io.SessionOutputBuffer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Optional;
 
 @RestController
 @RequestMapping("api/bet")
@@ -16,6 +23,8 @@ public class HustleController
 {
     @Autowired
     private HustleService hustleService;
+    @Autowired
+    private UserRepository userRepository;
 
     @PostMapping("/create")
     public Object createHustle(@Valid @RequestBody SearchRequest.BetRequestDTO req){
@@ -28,8 +37,11 @@ public class HustleController
     }
 
     @GetMapping("/getUsersBet")
-    public Object getUsersBet(@RequestParam String userId){
-        return hustleService.getUserBets(userId);
+    public Object getUsersBet(@AuthenticationPrincipal UserDetails user){
+        Optional<User> authuser =userRepository.findUserByEmail(user.getUsername());
+        User user1= authuser.get();
+        System.out.println("getttinuer baet" +user1.getId());
+        return hustleService.getUserBets(user1.getId());
     }
 
     @GetMapping("/viewBet")
