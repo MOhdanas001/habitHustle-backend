@@ -3,11 +3,13 @@ package com.habithustle.habithustle_backend.services;
 import com.habithustle.habithustle_backend.DTO.SearchRequest;
 import com.habithustle.habithustle_backend.model.Hustle;
 import com.habithustle.habithustle_backend.model.Proofs;
+import com.habithustle.habithustle_backend.model.User;
 import com.habithustle.habithustle_backend.model.bet.*;
 import com.habithustle.habithustle_backend.repository.HustleRepository;
 import com.habithustle.habithustle_backend.repository.ProofRepository;
 import com.habithustle.habithustle_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -120,8 +122,16 @@ public class HustleService {
         boolean allPaid = bet.getParticipants().stream()
                 .allMatch(p -> p.getPaymentStatus() == PaymentStatus.PAID);
 
-        if (allPaid) {
+        LocalDateTime startDate= bet.getStartDate();
+
+
+        if (allPaid && startDate.isAfter(LocalDateTime.now())) {
             bet.setBetStatus(BetStatus.ACTIVE);
+            bet.getParticipants()
+                    .forEach(p -> p.setBetStatus(BetParticipationStatus.ACTIVE));
+        }
+        else{
+            bet.setBetStatus(BetStatus.ALL_PAID);
             bet.getParticipants()
                     .forEach(p -> p.setBetStatus(BetParticipationStatus.ACTIVE));
         }
@@ -135,12 +145,50 @@ public class HustleService {
     /* ---------------------------------------------------
        VIEW BET
     --------------------------------------------------- */
-    public Object viewBet(String betId) {
+    public Object viewBet(String betId, String userEmail) {
+
         Hustle bet = hustleRepository.findById(betId)
                 .orElseThrow(() -> new RuntimeException("Bet not found"));
 
-        return Map.of("status", 1, "data", bet);
+        User user = userRepository.findUserByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check verifier
+
+
+        // ---- Progress Calculation ----
+        LocalDate startDate = bet.getStartDate().toLocalDate();
+        LocalDate endDate = bet.getEndDate().toLocalDate();
+        LocalDate today = LocalDate.now();
+
+        long totalDays = ChronoUnit.DAYS.between(startDate, endDate);
+        long completedDays = ChronoUnit.DAYS.between(startDate, today);
+
+        int progress;
+
+        if (today.isBefore(startDate)) {
+            progress = 0;
+        } else if (today.isAfter(endDate)) {
+            progress = 100;
+        } else {
+            progress = (int) Math.min(100, (completedDays * 100) / totalDays);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        if (user.getId().equals(bet.getVerifierId())) {
+            response.put("verifier",true);
+        } else {
+            response.put("verifier",false);
+        }
+
+
+        response.put("status", 1);
+        response.put("data", bet);
+        response.put("progress", progress);
+
+        return response;
     }
+
 
     /* ---------------------------------------------------
        USER BETS
@@ -268,27 +316,50 @@ public class HustleService {
         Proofs proof = proofRepo.findById(proofId)
                 .orElseThrow(() -> new RuntimeException("Proof not found"));
 
+        User user = userRepository.findUserByEmail(proof.getParticipantId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         SearchRequest.Participants participant = bet.getParticipants().stream()
                 .filter(p -> p.getUserId().equals(proof.getParticipantId()))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Participant not found"));
 
-        ProofStatus status = verified ? ProofStatus.VERIFIED : ProofStatus.REJECTED;
+        ProofStatus status;
+
+        if (verified) {
+            status = ProofStatus.VERIFIED;
+
+            // ✅ increment authoritative streak
+            user.setStreak(user.getStreak() + 1);
+
+            // ✅ immediately reflect in UI
+            user.setDisplayStreak(user.getStreak());
+
+            participant.setBetStatus(BetParticipationStatus.ACTIVE);
+
+        } else {
+            status = ProofStatus.REJECTED;
+            user.setDisplayStreak(0);
+            participant.setBetStatus(BetParticipationStatus.FAILED);
+        }
 
         participant.getProofs().put(proofId, status);
         proof.setStatus(status);
         proof.setUpdatedAt(LocalDateTime.now());
-
-        if (!verified) {
-            participant.setBetStatus(BetParticipationStatus.FAILED);
-        }
-
         bet.setUpdatedAt(LocalDateTime.now());
 
+        userRepository.save(user);
         proofRepo.save(proof);
         hustleRepository.save(bet);
 
-        return Map.of("status", 1, "message",
-                verified ? "Proof verified" : "Proof rejected");
+        return Map.of(
+                "status", 1,
+                "message", verified ? "Proof verified" : "Proof rejected"
+        );
     }
+
+
+
+
+
 }

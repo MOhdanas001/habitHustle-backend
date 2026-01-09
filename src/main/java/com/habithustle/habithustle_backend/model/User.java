@@ -53,6 +53,8 @@ public class User {
 
     private Set<String> bets = new HashSet<>();
 
+    private Integer streak;        // authoritative
+    private Integer displayStreak;
 
     private Map<String, RequestStatus> sentRequests = new HashMap<>();
 

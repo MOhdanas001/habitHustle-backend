@@ -10,5 +10,7 @@ import java.util.Optional;
 public interface HustleRepository extends MongoRepository<Hustle,String> {
 
     List<Hustle> findByParticipantsUserId(String userId);
+    List<Hustle> findByVerifierId(String userId);
+
 
 }

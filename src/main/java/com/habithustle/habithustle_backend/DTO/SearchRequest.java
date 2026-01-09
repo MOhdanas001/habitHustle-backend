@@ -58,7 +58,7 @@ public class SearchRequest {
         private String userId;
         private PaymentStatus paymentStatus;
         private BetParticipationStatus betStatus;
-        private Map<String, ProofStatus> proofs; // proofId -> status
+        private Map<String, ProofStatus> proofs;
         private Integer usedOffDays;
     }
 }
